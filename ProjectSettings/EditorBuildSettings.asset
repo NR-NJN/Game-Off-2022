@@ -6,9 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 9fc0d4010bbf28b4594072e72b8655ab
-  - enabled: 1
-    path: Assets/Scenes/Hallway.unity
-    guid: 21315d92d14d10348a3bade8a2fe5a7b
-  m_configObjects: {}
+    path: Assets/Scenes/OutsideHouse.unity
+    guid: a4fb1cf6900484748ab067d41df43990
+  m_configObjects:
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 91aead6fa68da3d4e9bb60482676476f, type: 3}

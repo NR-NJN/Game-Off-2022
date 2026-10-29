@@ -72,3 +72,14 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 .plastic
+
+# Plastic SCM / Unity Version Control leftovers
+*.private
+*.private.[0-9]*
+.plastic/
+ignore.conf
+.collabignore
+/Assets/Plugins/PlasticSCM*
+
+# Visual Studio upgrade reports
+UpgradeLog*.htm
