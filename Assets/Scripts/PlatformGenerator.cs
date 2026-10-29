@@ -1,47 +1,58 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class PlatformGenerator : MonoBehaviour
 {
     public GameObject player;
+    public GameObject firstPlatform;
     public GameObject[] platforms;
-    public int maxPlatforms = 4;
+    public GameObject[] scenery;
+    public int maxPlatforms = 7;
+    public float spawnDistance = 70f;
+    public int sceneryPerPlatform = 2;
+    public Vector2 sceneryOffset = new Vector2(2f, 3f);
 
-    private Vector3 firstPosition, lastPosition;
-    private GameObject lastPlatform;
-    private int platformCurr;
-    private int platformStart;
+    private readonly Queue<GameObject> spawned = new Queue<GameObject>();
+    private Transform lastEnd;
+    private int platformCount;
 
     void Start()
     {
-        GameObject platform = platforms[0];
-        lastPlatform = Instantiate(platform, player.transform.position + Vector3.down * 3, Quaternion.identity);
-        lastPosition = lastPlatform.transform.GetChild(1).position;
-        platformCurr = platformStart = 1;
-        lastPlatform.name = "roadey_" + platformCurr;
+        spawned.Enqueue(firstPlatform);
+        lastEnd = firstPlatform.transform.Find("end");
     }
 
     void Update()
     {
-        float edge = player.transform.position.x + lastPlatform.GetComponent<Collider>().bounds.size.x;
+        while (lastEnd.position.x < player.transform.position.x + spawnDistance)
+            Spawn();
+    }
 
-        if (edge > lastPosition.x) {
-            GameObject platform = platforms[Random.Range(0, platforms.Length)];
+    private void Spawn()
+    {
+        GameObject platform = Instantiate(platforms[Random.Range(0, platforms.Length)]);
+        Transform start = platform.transform.Find("start");
+        platform.transform.position += lastEnd.position - start.position;
+        platform.name = "road_" + ++platformCount;
 
-            firstPosition = platform.transform.GetChild(0).position;
-            Vector3 position = lastPosition + platform.transform.position - firstPosition;
+        AddScenery(platform.transform, start.position, platform.transform.Find("end").position);
+        lastEnd = platform.transform.Find("end");
 
-            lastPlatform = Instantiate(platform, position, Quaternion.identity);
-            platformCurr++;
-            lastPlatform.name = "roadey_" + platformCurr;
-            lastPosition = lastPlatform.transform.GetChild(1).position;
+        spawned.Enqueue(platform);
+        while (spawned.Count > maxPlatforms)
+            Destroy(spawned.Dequeue());
+    }
 
-            if(platformCurr - platformStart >= maxPlatforms) {
-                GameObject target = GameObject.Find("roadey_" + platformStart);
-                Destroy(target);
-                platformStart++;
-            }
+    private void AddScenery(Transform platform, Vector3 from, Vector3 to)
+    {
+        if (scenery.Length == 0)
+            return;
+
+        for (int i = 0; i < sceneryPerPlatform; i++)
+        {
+            Vector3 position = Vector3.Lerp(from, to, Random.value) + Vector3.forward * Random.Range(sceneryOffset.x, sceneryOffset.y);
+            Quaternion rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+            Instantiate(scenery[Random.Range(0, scenery.Length)], position, rotation, platform);
         }
     }
 }

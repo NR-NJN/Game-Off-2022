@@ -1,6 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class CameraMovement : MonoBehaviour
 {
@@ -16,9 +15,9 @@ public class CameraMovement : MonoBehaviour
 
     private Vector3 velocity = Vector3.zero;
 
-    void FixedUpdate()
+    void LateUpdate()
     {
-        Vector3 followVec = this.follow.transform.position + offset; 
+        Vector3 followVec = this.follow.transform.position + offset;
         Vector3 destination = new Vector3(
             (trackXAxis) ? followVec.x : this.transform.position.x,
             (trackYAxis) ? followVec.y : this.transform.position.y,
@@ -29,9 +28,14 @@ public class CameraMovement : MonoBehaviour
             this.transform.position, destination, ref velocity, smoothTime
         );
 
+        if (Screen.width <= 0 || Screen.height <= 0)
+            return;
+
+        Vector2 pointer = (Pointer.current != null) ? Pointer.current.position.ReadValue() : new Vector2(Screen.width, Screen.height) / 2f;
+
         this.transform.rotation = Quaternion.Euler(
-            maxRotation.x * (Mathf.Min(1f, Mathf.Max(0f, Input.mousePosition.y / Screen.height)) * 2 - 1) * -1,
-            maxRotation.y * (Mathf.Min(1f, Mathf.Max(0f, Input.mousePosition.x / Screen.width)) * 2 - 1),
+            maxRotation.x * (Mathf.Clamp01(pointer.y / Screen.height) * 2 - 1) * -1,
+            maxRotation.y * (Mathf.Clamp01(pointer.x / Screen.width) * 2 - 1),
             0f
         );
     }
