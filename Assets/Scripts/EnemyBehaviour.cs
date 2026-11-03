@@ -7,7 +7,7 @@ public enum EnemyMove { Ram, Wave, Burst }
 [RequireComponent(typeof(Rigidbody))]
 public class EnemyBehaviour : MonoBehaviour
 {
-    private enum Mode { Rest, Charge, Pullback, Retreat }
+    private enum Mode { Rest, Charge, Bump, Pullback, Retreat }
 
     public GameObject follow;
 
@@ -37,6 +37,18 @@ public class EnemyBehaviour : MonoBehaviour
     public float chargeOvershoot = 6f;
     public float pullbackSpeed = 35f;
     public float maxChargeTime = 3f;
+
+    [Header("Bump")]
+    public float bumpRange = 9f;
+    [Range(0f, 1f)]
+    public float bumpSpeedThreshold = 0.15f;
+    public float bumpDelay = 2f;
+    public float bumpLineUp = 0.6f;
+    public float bumpSpeed = 18f;
+    public float bumpResponse = 70f;
+    public float bumpCommit = 2.5f;
+    public float bumpOvershoot = 1.5f;
+    public float maxBumpTime = 2.5f;
 
     [Header("Burst")]
     public Minigun minigun;
@@ -72,6 +84,8 @@ public class EnemyBehaviour : MonoBehaviour
     private int lane;
     private bool trackLane;
     private bool hitTarget;
+    private bool busy;
+    private float stalledSince;
     private float bodyLength;
     private string lastOrder;
 
@@ -91,7 +105,9 @@ public class EnemyBehaviour : MonoBehaviour
 
     void Start()
     {
+        stalledSince = Time.time;
         StartCoroutine(Moves());
+        StartCoroutine(Stalling());
     }
 
     void FixedUpdate()
@@ -103,6 +119,9 @@ public class EnemyBehaviour : MonoBehaviour
         {
             case Mode.Charge:
                 Steer(new Vector3(rb.position.x + chargeSpeed, 0f, LaneZ()), chargeSpeed, chargeResponse, chargeResponse);
+                break;
+            case Mode.Bump:
+                Steer(new Vector3(rb.position.x + bumpSpeed, 0f, LaneZ()), bumpSpeed, bumpResponse, bumpResponse);
                 break;
             case Mode.Pullback:
                 Steer(RestPoint(), pullbackSpeed, chargeResponse, chargeResponse);
@@ -126,6 +145,12 @@ public class EnemyBehaviour : MonoBehaviour
             hitTarget = true;
             Debug.Log("Tuk-tuk rammed the player");
         }
+        else if (mode == Mode.Bump)
+        {
+            hitTarget = true;
+            Shove();
+            Debug.Log("Tuk-tuk bumped the stalling player");
+        }
         else
         {
             Vector3 velocity = rb.linearVelocity;
@@ -143,6 +168,10 @@ public class EnemyBehaviour : MonoBehaviour
         {
             yield return new WaitForSeconds(Random.Range(restTime.x, restTime.y));
 
+            while (busy)
+                yield return null;
+
+            busy = true;
             EnemyMove move = NextMove(last, streak);
             streak = move == last ? streak + 1 : 1;
             last = move;
@@ -152,7 +181,70 @@ public class EnemyBehaviour : MonoBehaviour
                 yield return Burst();
             else
                 yield return Ram();
+            busy = false;
+            stalledSince = Time.time;
         }
+    }
+
+    private IEnumerator Stalling()
+    {
+        while (true)
+        {
+            if (busy || !Stalled())
+                stalledSince = Time.time;
+            else if (Time.time - stalledSince >= bumpDelay)
+            {
+                busy = true;
+                yield return Bump();
+                busy = false;
+                stalledSince = Time.time;
+            }
+            yield return null;
+        }
+    }
+
+    private bool Stalled()
+    {
+        float gap = target.position.x - rb.position.x;
+        float crawl = Mathf.Lerp(player.speed.minimum, player.speed.maximum, bumpSpeedThreshold);
+        return gap > 0f && gap <= bumpRange && player.speed.current <= crawl;
+    }
+
+    private IEnumerator Bump()
+    {
+        trackLane = true;
+        lane = lanes.current;
+        float end = Time.time + bumpLineUp;
+        while (Mathf.Abs(rb.position.z - LaneZ()) > 0.2f && Time.time < end)
+            yield return new WaitForFixedUpdate();
+
+        hitTarget = false;
+        mode = Mode.Bump;
+        end = Time.time + maxBumpTime;
+        while (!hitTarget && rb.position.x < target.position.x + bumpOvershoot && Time.time < end)
+        {
+            if (trackLane && target.position.x - rb.position.x <= bumpCommit)
+                trackLane = false;
+            yield return new WaitForFixedUpdate();
+        }
+
+        trackLane = false;
+        SetIgnoreTarget(true);
+        mode = Mode.Pullback;
+        end = Time.time + maxChargeTime;
+        while (Mathf.Abs(rb.position.x - RestPoint().x) > 1f && Time.time < end)
+            yield return new WaitForFixedUpdate();
+
+        mode = Mode.Rest;
+        SetIgnoreTarget(false);
+    }
+
+    private void Shove()
+    {
+        player.speed.current = player.speed.maximum;
+        Vector3 velocity = target.linearVelocity;
+        velocity.x = player.speed.maximum;
+        target.linearVelocity = velocity;
     }
 
     private EnemyMove NextMove(EnemyMove last, int streak)
